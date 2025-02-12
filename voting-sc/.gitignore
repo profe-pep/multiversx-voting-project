@@ -1,0 +1,8 @@
+## Wallet
+wallet/
+
+## Build
+output/
+target/
+wasm/
+Cargo.lock
