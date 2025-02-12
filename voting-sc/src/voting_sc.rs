@@ -23,7 +23,8 @@ pub trait VotingContract {
         poll_question: ManagedBuffer<Self::Api>,
         options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
         start_time: u64,
-        end_time: u64
+        end_time: u64,
+        allow_vote_change: bool
     ) {
         require!(
             options.len() > 1, 
@@ -48,6 +49,7 @@ pub trait VotingContract {
 
         self.start_time().set(start_time);
         self.end_time().set(end_time);
+        self.allow_vote_change().set(allow_vote_change);
     }
 
     #[view(getPollQuestion)]
@@ -72,6 +74,11 @@ pub trait VotingContract {
         (self.start_time().get(), self.end_time().get())
     }
 
+    #[view(canChangeVote)]
+    fn can_change_vote(&self) -> bool {
+        self.allow_vote_change().get()
+    }
+
     #[endpoint(castVote)]
     fn cast_vote(&self, option_index: usize) {
         let current_time = self.blockchain().get_block_timestamp();
@@ -86,11 +93,26 @@ pub trait VotingContract {
         );
 
         let caller = self.blockchain().get_caller();
-        require!(
-            !self.has_voted(&caller), 
-            "You have already voted."
-        );
 
+        // Comprova si l'usuari ja ha votat
+        if self.has_voted(&caller) {
+            // Si el canvi de vot no està permès, denega la votació
+            require!(
+                self.allow_vote_change().get(),
+                "You have already voted and vote change is not allowed."
+            );
+
+            // Si es permet canviar el vot, troba l'opció anterior i resta un vot
+            let previous_vote = self.user_votes().get(&caller);
+            let mut options = self.options();
+            if let Some(index) = previous_vote {
+                let mut previous_option = options.get(index);
+                previous_option.vote_count -= 1;
+                options.set(index, &previous_option);
+            }
+        }
+
+        // Continua amb el procés de votació
         let mut options = self.options();
         require!(
             option_index < options.len(), 
@@ -101,6 +123,10 @@ pub trait VotingContract {
         poll_option.vote_count += 1;
         options.set(option_index, &poll_option);
 
+        // Desa l'opció votada per aquest usuari
+        self.user_votes().insert(caller.clone(), option_index);
+
+        // Desa l'adreça per saber que ha votat
         self.voted_addresses().insert(caller.clone());
 
         self.emit_vote_cast_event(VoteCastEvent {
@@ -127,6 +153,12 @@ pub trait VotingContract {
 
     #[storage_mapper("end_time")]
     fn end_time(&self) -> SingleValueMapper<Self::Api, u64>;
+
+    #[storage_mapper("allow_vote_change")]
+    fn allow_vote_change(&self) -> SingleValueMapper<Self::Api, bool>;
+
+    #[storage_mapper("user_votes")]
+    fn user_votes(&self) -> MapMapper<Self::Api, ManagedAddress<Self::Api>, usize>;
 
     // Helper
     fn has_voted(&self, address: &ManagedAddress<Self::Api>) -> bool {
