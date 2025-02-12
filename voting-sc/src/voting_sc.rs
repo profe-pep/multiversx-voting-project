@@ -21,11 +21,18 @@ pub trait VotingContract {
     fn init(
         &self,
         poll_question: ManagedBuffer<Self::Api>,
-        options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>
+        options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
+        start_time: u64,
+        end_time: u64
     ) {
         require!(
             options.len() > 1, 
             "There must be at least two options to vote on."
+        );
+
+        require!(
+            start_time < end_time,
+            "Start time must be before end time."
         );
 
         self.poll_question().set(poll_question);
@@ -38,6 +45,9 @@ pub trait VotingContract {
             };
             self.options().push(&poll_option);
         }
+
+        self.start_time().set(start_time);
+        self.end_time().set(end_time);
     }
 
     #[view(getPollQuestion)]
@@ -57,8 +67,24 @@ pub trait VotingContract {
         result
     }
 
+    #[view(getVotingPeriod)]
+    fn get_voting_period(&self) -> (u64, u64) {
+        (self.start_time().get(), self.end_time().get())
+    }
+
     #[endpoint(castVote)]
     fn cast_vote(&self, option_index: usize) {
+        let current_time = self.blockchain().get_block_timestamp();
+        require!(
+            current_time >= self.start_time().get(),
+            "Voting has not started yet."
+        );
+
+        require!(
+            current_time <= self.end_time().get(),
+            "Voting has ended."
+        );
+
         let caller = self.blockchain().get_caller();
         require!(
             !self.has_voted(&caller), 
@@ -87,7 +113,6 @@ pub trait VotingContract {
     fn emit_vote_cast_event(&self, vote_event: VoteCastEvent<Self::Api>);
 
     // Storage
-    #[view(getPollQuestion)]
     #[storage_mapper("poll_question")]
     fn poll_question(&self) -> SingleValueMapper<Self::Api, ManagedBuffer<Self::Api>>;
 
@@ -96,7 +121,13 @@ pub trait VotingContract {
 
     #[storage_mapper("voted_addresses")]
     fn voted_addresses(&self) -> UnorderedSetMapper<Self::Api, ManagedAddress<Self::Api>>;
-    
+
+    #[storage_mapper("start_time")]
+    fn start_time(&self) -> SingleValueMapper<Self::Api, u64>;
+
+    #[storage_mapper("end_time")]
+    fn end_time(&self) -> SingleValueMapper<Self::Api, u64>;
+
     // Helper
     fn has_voted(&self, address: &ManagedAddress<Self::Api>) -> bool {
         self.voted_addresses().contains(address)
