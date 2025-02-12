@@ -10,158 +10,165 @@ pub struct PollOption<M: ManagedTypeApi> {
 }
 
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi)]
-pub struct VoteCastEvent<M: ManagedTypeApi> {
-    voter: ManagedAddress<M>,
-    option_name: ManagedBuffer<M>,
+pub struct Poll<M: ManagedTypeApi> {
+    question: ManagedBuffer<M>,
+    options: ManagedVec<M, PollOption<M>>,
+    creator: ManagedAddress<M>,
+    start_time: u64,
+    end_time: u64,
+    is_closed: bool,
 }
 
 #[multiversx_sc::contract]
 pub trait VotingContract {
     #[init]
-    fn init(
+    fn init(&self) {
+        self.total_polls().set(0u64);
+    }
+
+    /// Crear una nova votació
+    #[endpoint(createPoll)]
+    fn create_poll(
         &self,
-        poll_question: ManagedBuffer<Self::Api>,
+        question: ManagedBuffer<Self::Api>,
         options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
         start_time: u64,
-        end_time: u64,
-        allow_vote_change: bool
+        end_time: u64
     ) {
-        require!(
-            options.len() > 1, 
-            "There must be at least two options to vote on."
-        );
+        require!(options.len() > 1, "Almenys han d'haver dues opcions");
+        require!(end_time > start_time, "La data de fi ha de ser després de la d'inici");
+        require!(end_time > self.blockchain().get_block_timestamp(), "La data de fi ha de ser al futur");
 
-        require!(
-            start_time < end_time,
-            "Start time must be before end time."
-        );
+        let creator = self.blockchain().get_caller();
+        let poll_id = self.total_polls().get();
+        self.total_polls().set(poll_id + 1);
 
-        self.poll_question().set(poll_question);
-        self.options().clear();
-
+        let mut poll_options = ManagedVec::new();
         for option in options.iter() {
-            let poll_option = PollOption {
+            poll_options.push(PollOption {
                 name: option.clone_value(),
                 vote_count: 0,
-            };
-            self.options().push(&poll_option);
+            });
         }
 
-        self.start_time().set(start_time);
-        self.end_time().set(end_time);
-        self.allow_vote_change().set(allow_vote_change);
+        let poll = Poll {
+            question,
+            options: poll_options,
+            creator,
+            start_time,
+            end_time,
+            is_closed: false,
+        };
+
+        self.polls().insert(poll_id, &poll);
     }
 
-    #[view(getPollQuestion)]
-    fn get_poll_question(&self) -> ManagedBuffer<Self::Api> {
-        self.poll_question().get()
-    }
-
-    #[view(getOptions)]
-    fn get_options(&self) -> ManagedVec<Self::Api, PollOption<Self::Api>> {
-        let mut result = ManagedVec::new();
-        let options = self.options();
-
-        for option in options.iter() {
-            result.push(option);
-        }
-
-        result
-    }
-
-    #[view(getVotingPeriod)]
-    fn get_voting_period(&self) -> (u64, u64) {
-        (self.start_time().get(), self.end_time().get())
-    }
-
-    #[view(canChangeVote)]
-    fn can_change_vote(&self) -> bool {
-        self.allow_vote_change().get()
-    }
-
+    /// Votar en una votació existent
     #[endpoint(castVote)]
-    fn cast_vote(&self, option_index: usize) {
-        let current_time = self.blockchain().get_block_timestamp();
-        require!(
-            current_time >= self.start_time().get(),
-            "Voting has not started yet."
-        );
-
-        require!(
-            current_time <= self.end_time().get(),
-            "Voting has ended."
-        );
-
+    fn cast_vote(&self, poll_id: u64, option_index: usize) {
         let caller = self.blockchain().get_caller();
-
-        // Comprova si l'usuari ja ha votat
-        if self.has_voted(&caller) {
-            // Si el canvi de vot no està permès, denega la votació
-            require!(
-                self.allow_vote_change().get(),
-                "You have already voted and vote change is not allowed."
-            );
-
-            // Si es permet canviar el vot, troba l'opció anterior i resta un vot
-            let previous_vote = self.user_votes().get(&caller);
-            let mut options = self.options();
-            if let Some(index) = previous_vote {
-                let mut previous_option = options.get(index);
-                previous_option.vote_count -= 1;
-                options.set(index, &previous_option);
-            }
-        }
-
-        // Continua amb el procés de votació
-        let mut options = self.options();
         require!(
-            option_index < options.len(), 
-            "Invalid option index."
+            !self.has_voted(poll_id, &caller), 
+            "Ja has votat en aquesta votació."
         );
 
-        let mut poll_option = options.get(option_index);
-        poll_option.vote_count += 1;
-        options.set(option_index, &poll_option);
+        let current_time = self.blockchain().get_block_timestamp();
+        let mut poll = self.polls().get(poll_id).unwrap();
+        
+        require!(
+            !poll.is_closed,
+            "Aquesta votació està tancada."
+        );
 
-        // Desa l'opció votada per aquest usuari
-        self.user_votes().insert(caller.clone(), option_index);
+        require!(
+            current_time >= poll.start_time && current_time <= poll.end_time,
+            "Aquesta votació no està activa."
+        );
 
-        // Desa l'adreça per saber que ha votat
-        self.voted_addresses().insert(caller.clone());
+        require!(
+            option_index < poll.options.len(),
+            "Índex d'opció no vàlid."
+        );
 
-        self.emit_vote_cast_event(VoteCastEvent {
-            voter: caller,
-            option_name: poll_option.name.clone(),
-        });
+        let mut option = poll.options.get(option_index);
+        option.vote_count += 1;
+        poll.options.set(option_index, &option);
+
+        self.polls().insert(poll_id, &poll);
+        self.voted_addresses(poll_id).insert(caller);
     }
 
-    #[event("vote_cast")]
-    fn emit_vote_cast_event(&self, vote_event: VoteCastEvent<Self::Api>);
+    /// Tancar anticipadament una votació (només el creador pot fer-ho)
+    #[endpoint(closePoll)]
+    fn close_poll(&self, poll_id: u64) {
+        let caller = self.blockchain().get_caller();
+        let mut poll = self.polls().get(poll_id).unwrap();
+        
+        require!(
+            poll.creator == caller,
+            "Només el creador pot tancar aquesta votació."
+        );
+
+        poll.is_closed = true;
+        self.polls().insert(poll_id, &poll);
+    }
+
+    /// Modificar una votació (només el creador pot fer-ho)
+    #[endpoint(modifyPoll)]
+    fn modify_poll(
+        &self,
+        poll_id: u64,
+        new_question: ManagedBuffer<Self::Api>,
+        new_options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
+        new_start_time: u64,
+        new_end_time: u64
+    ) {
+        let caller = self.blockchain().get_caller();
+        let mut poll = self.polls().get(poll_id).unwrap();
+        
+        require!(
+            poll.creator == caller,
+            "Només el creador pot modificar aquesta votació."
+        );
+
+        require!(new_options.len() > 1, "Almenys han d'haver dues opcions");
+        require!(new_end_time > new_start_time, "La data de fi ha de ser després de la d'inici");
+        require!(new_end_time > self.blockchain().get_block_timestamp(), "La data de fi ha de ser al futur");
+
+        poll.question = new_question;
+        poll.options.clear();
+
+        for option in new_options.iter() {
+            poll.options.push(PollOption {
+                name: option.clone_value(),
+                vote_count: 0,  // Es reinicia el recompte
+            });
+        }
+
+        poll.start_time = new_start_time;
+        poll.end_time = new_end_time;
+
+        self.polls().insert(poll_id, &poll);
+    }
+
+    /// Consultar una votació i les seves opcions
+    #[view(getPoll)]
+    fn get_poll(&self, poll_id: u64) -> Poll<Self::Api> {
+        self.polls().get(poll_id).unwrap()
+    }
 
     // Storage
-    #[storage_mapper("poll_question")]
-    fn poll_question(&self) -> SingleValueMapper<Self::Api, ManagedBuffer<Self::Api>>;
+    #[storage_mapper("polls")]
+    fn polls(&self) -> MapMapper<Self::Api, u64, Poll<Self::Api>>;
 
-    #[storage_mapper("options")]
-    fn options(&self) -> VecMapper<Self::Api, PollOption<Self::Api>>;
+    #[storage_mapper("total_polls")]
+    fn total_polls(&self) -> SingleValueMapper<Self::Api, u64>;
 
     #[storage_mapper("voted_addresses")]
-    fn voted_addresses(&self) -> UnorderedSetMapper<Self::Api, ManagedAddress<Self::Api>>;
-
-    #[storage_mapper("start_time")]
-    fn start_time(&self) -> SingleValueMapper<Self::Api, u64>;
-
-    #[storage_mapper("end_time")]
-    fn end_time(&self) -> SingleValueMapper<Self::Api, u64>;
-
-    #[storage_mapper("allow_vote_change")]
-    fn allow_vote_change(&self) -> SingleValueMapper<Self::Api, bool>;
-
-    #[storage_mapper("user_votes")]
-    fn user_votes(&self) -> MapMapper<Self::Api, ManagedAddress<Self::Api>, usize>;
+    fn voted_addresses(&self, poll_id: u64) -> UnorderedSetMapper<Self::Api, ManagedAddress<Self::Api>>;
 
     // Helper
-    fn has_voted(&self, address: &ManagedAddress<Self::Api>) -> bool {
-        self.voted_addresses().contains(address)
+    fn has_voted(&self, poll_id: u64, address: &ManagedAddress<Self::Api>) -> bool {
+        self.voted_addresses(poll_id).contains(address)
     }
 }
