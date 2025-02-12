@@ -26,7 +26,7 @@ pub trait VotingContract {
         self.total_polls().set(0u64);
     }
 
-    /// Crear una nova votació
+    // Crear una nova votació
     #[endpoint(createPoll)]
     fn create_poll(
         &self,
@@ -35,10 +35,19 @@ pub trait VotingContract {
         start_time: u64,
         end_time: u64
     ) {
-        require!(options.len() > 1, "Almenys han d'haver dues opcions");
-        require!(end_time > start_time, "La data de fi ha de ser després de la d'inici");
-        require!(end_time > self.blockchain().get_block_timestamp(), "La data de fi ha de ser al futur");
-
+        require!(
+            options.len() > 1, 
+            "Almenys han d'haver dues opcions"
+        );
+        require!(
+            end_time > start_time, 
+            "La data de fi ha de ser després de la d'inici"
+        );
+        require!(
+            end_time > self.blockchain().get_block_timestamp(), 
+            "La data de fi ha de ser al futur"
+        );
+        
         let creator = self.blockchain().get_caller();
         let poll_id = self.total_polls().get();
         self.total_polls().set(poll_id + 1);
@@ -63,7 +72,7 @@ pub trait VotingContract {
         self.polls().insert(poll_id, &poll);
     }
 
-    /// Votar en una votació existent
+    // Votar en una votació existent
     #[endpoint(castVote)]
     fn cast_vote(&self, poll_id: u64, option_index: usize) {
         let caller = self.blockchain().get_caller();
@@ -98,7 +107,7 @@ pub trait VotingContract {
         self.voted_addresses(poll_id).insert(caller);
     }
 
-    /// Tancar anticipadament una votació (només el creador pot fer-ho)
+    // Tancar anticipadament una votació (només el creador pot fer-ho)
     #[endpoint(closePoll)]
     fn close_poll(&self, poll_id: u64) {
         let caller = self.blockchain().get_caller();
@@ -113,7 +122,7 @@ pub trait VotingContract {
         self.polls().insert(poll_id, &poll);
     }
 
-    /// Modificar una votació (només el creador pot fer-ho)
+    // Modificar una votació (només el creador pot fer-ho)
     #[endpoint(modifyPoll)]
     fn modify_poll(
         &self,
@@ -131,27 +140,62 @@ pub trait VotingContract {
             "Només el creador pot modificar aquesta votació."
         );
 
-        require!(new_options.len() > 1, "Almenys han d'haver dues opcions");
-        require!(new_end_time > new_start_time, "La data de fi ha de ser després de la d'inici");
-        require!(new_end_time > self.blockchain().get_block_timestamp(), "La data de fi ha de ser al futur");
+        require!(
+            !poll.is_closed,
+            "No es pot modificar una votació tancada."
+        );
 
-        poll.question = new_question;
-        poll.options.clear();
+        // Comprova l'estat de la votació
+        let current_time = self.blockchain().get_block_timestamp();
+        let has_started = current_time >= poll.start_time;
+        let has_ended = current_time > poll.end_time;
 
-        for option in new_options.iter() {
-            poll.options.push(PollOption {
-                name: option.clone_value(),
-                vote_count: 0,  // Es reinicia el recompte
-            });
+        if has_started {
+            // Si la votació ha començat, només permet modificar la data de fi
+            require!(
+                !has_ended,
+                "No es pot modificar una votació que ja ha finalitzat."
+            );
+
+            require!(
+                new_end_time > current_time,
+                "La nova data de fi ha de ser al futur per allargar la votació."
+            );
+
+            poll.end_time = new_end_time;
+        } else {
+            // Si la votació encara no ha començat, permet modificar tot
+            require!(
+                new_options.len() > 1, 
+                "Almenys han d'haver dues opcions"
+            );
+            require!(
+                new_end_time > new_start_time, 
+                "La data de fi ha de ser després de la d'inici"
+            );
+            require!(
+                new_end_time > current_time, 
+                "La data de fi ha de ser al futur"
+            );
+
+            poll.question = new_question;
+            poll.options.clear();
+
+            for option in new_options.iter() {
+                poll.options.push(PollOption {
+                    name: option.clone_value(),
+                    vote_count: 0,  // Es reinicia el recompte
+                });
+            }
+
+            poll.start_time = new_start_time;
+            poll.end_time = new_end_time;
         }
-
-        poll.start_time = new_start_time;
-        poll.end_time = new_end_time;
 
         self.polls().insert(poll_id, &poll);
     }
 
-    /// Consultar una votació i les seves opcions
+    // Consultar una votació i les seves opcions
     #[view(getPoll)]
     fn get_poll(&self, poll_id: u64) -> Poll<Self::Api> {
         self.polls().get(poll_id).unwrap()
