@@ -11,12 +11,13 @@ pub struct PollOption<M: ManagedTypeApi> {
 
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi)]
 pub struct Poll<M: ManagedTypeApi> {
+    creator: ManagedAddress<M>,
     question: ManagedBuffer<M>,
     options: ManagedVec<M, PollOption<M>>,
-    creator: ManagedAddress<M>,
     start_time: u64,
     end_time: u64,
     is_closed: bool,
+    can_change_vote: bool, // Afegit per permetre canviar el vot
 }
 
 #[multiversx_sc::contract]
@@ -33,7 +34,8 @@ pub trait VotingContract {
         question: ManagedBuffer<Self::Api>,
         options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
         start_time: u64,
-        end_time: u64
+        end_time: u64,
+        can_change_vote: bool
     ) {
         require!(
             options.len() > 1, 
@@ -47,10 +49,6 @@ pub trait VotingContract {
             end_time > self.blockchain().get_block_timestamp(), 
             "La data de fi ha de ser al futur"
         );
-        
-        let creator = self.blockchain().get_caller();
-        let poll_id = self.total_polls().get();
-        self.total_polls().set(poll_id + 1);
 
         let mut poll_options = ManagedVec::new();
         for option in options.iter() {
@@ -58,7 +56,9 @@ pub trait VotingContract {
                 name: option.clone_value(),
                 vote_count: 0,
             });
+
         }
+        let creator = self.blockchain().get_caller();
 
         let poll = Poll {
             question,
@@ -67,31 +67,29 @@ pub trait VotingContract {
             start_time,
             end_time,
             is_closed: false,
+            can_change_vote,
         };
 
+        let poll_id = self.total_polls().get();
         self.polls().insert(poll_id, &poll);
+        self.total_polls().set(poll_id + 1);
     }
 
-    // Votar en una votació existent
+    // Votar en una opció
     #[endpoint(castVote)]
     fn cast_vote(&self, poll_id: u64, option_index: usize) {
         let caller = self.blockchain().get_caller();
-        require!(
-            !self.has_voted(poll_id, &caller), 
-            "Ja has votat en aquesta votació."
-        );
-
-        let current_time = self.blockchain().get_block_timestamp();
         let mut poll = self.polls().get(poll_id).unwrap();
-        
+
         require!(
             !poll.is_closed,
             "Aquesta votació està tancada."
         );
 
+        let current_time = self.blockchain().get_block_timestamp();
         require!(
             current_time >= poll.start_time && current_time <= poll.end_time,
-            "Aquesta votació no està activa."
+            "La votació no està activa."
         );
 
         require!(
@@ -99,12 +97,48 @@ pub trait VotingContract {
             "Índex d'opció no vàlid."
         );
 
-        let mut option = poll.options.get(option_index);
-        option.vote_count += 1;
-        poll.options.set(option_index, &option);
+        if poll.can_change_vote {
+            // Si es pot canviar el vot, utilitzem "votes"
+            let mut votes = self.votes(&poll_id);
+
+            if let Some(&previous_vote) = votes.get(&caller) {
+                // Si ja ha votat, restem el vot de l'opció anterior
+                let mut previous_option = poll.options.get(previous_vote);
+                require!(
+                    previous_option.vote_count > 0,
+                    "Error en el recompte de vots."
+                );
+                previous_option.vote_count -= 1;
+                poll.options.set(previous_vote, &previous_option);
+            }
+
+            // Afegim el nou vot
+            let mut selected_option = poll.options.get(option_index);
+            selected_option.vote_count += 1;
+            poll.options.set(option_index, &selected_option);
+
+            // Guardem el nou vot
+            votes.insert(caller, option_index);
+
+        } else {
+            // Si NO es pot canviar el vot, utilitzem "voted_addresses"
+            let mut voted_addresses = self.voted_addresses(&poll_id);
+
+            require!(
+                !voted_addresses.contains(&caller),
+                "Ja has votat i no es permet canviar el vot."
+            );
+
+            // Afegim el vot
+            let mut selected_option = poll.options.get(option_index);
+            selected_option.vote_count += 1;
+            poll.options.set(option_index, &selected_option);
+
+            // Marquem que aquest usuari ha votat
+            voted_addresses.insert(caller);
+        }
 
         self.polls().insert(poll_id, &poll);
-        self.voted_addresses(poll_id).insert(caller);
     }
 
     // Tancar anticipadament una votació (només el creador pot fer-ho)
@@ -210,6 +244,9 @@ pub trait VotingContract {
 
     #[storage_mapper("voted_addresses")]
     fn voted_addresses(&self, poll_id: u64) -> UnorderedSetMapper<Self::Api, ManagedAddress<Self::Api>>;
+
+    #[storage_mapper("votes")]
+    fn votes(&self, poll_id: &u64) -> MapMapper<ManagedAddress<Self::Api>, usize>;
 
     // Helper
     fn has_voted(&self, poll_id: u64, address: &ManagedAddress<Self::Api>) -> bool {
