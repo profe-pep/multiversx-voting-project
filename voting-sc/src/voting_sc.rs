@@ -18,6 +18,7 @@ pub struct Poll<M: ManagedTypeApi> {
     end_time: u64,
     is_closed: bool,
     can_change_vote: bool, // Afegit per permetre canviar el vot
+    whitelisted_addresses: Option<ManagedVec<M, ManagedAddress<M>>>, // Cens opcional
 }
 
 #[multiversx_sc::contract]
@@ -35,7 +36,8 @@ pub trait VotingContract {
         options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
         start_time: u64,
         end_time: u64,
-        can_change_vote: bool
+        can_change_vote: bool,
+        voter_whitelist: OptionalValue<ManagedVec<ManagedAddress<Self::Api>>>
     ) {
         require!(
             options.len() > 1, 
@@ -58,16 +60,19 @@ pub trait VotingContract {
             });
 
         }
-        let creator = self.blockchain().get_caller();
 
         let poll = Poll {
+            creator: self.blockchain().get_caller(),
             question,
             options: poll_options,
-            creator,
             start_time,
             end_time,
             is_closed: false,
             can_change_vote,
+            whitelisted_addresses: match voter_whitelist {
+                OptionalValue::Some(whitelist) => Some(whitelist),
+                OptionalValue::None => None,
+            }
         };
 
         let poll_id = self.total_polls().get();
@@ -96,6 +101,14 @@ pub trait VotingContract {
             option_index < poll.options.len(),
             "Índex d'opció no vàlid."
         );
+
+        // Comprovació de cens
+        if let Some(whitelist) = &poll.whitelisted_addresses {
+            require!(
+                whitelist.iter().any(|addr| addr == &caller), 
+                "No estàs al cens de votants."
+            );
+        }
 
         if poll.can_change_vote {
             // Si es pot canviar el vot, utilitzem "votes"
@@ -256,7 +269,35 @@ pub trait VotingContract {
 
         results
     }
-    
+
+    // Consultar estadístiques de participació d'una votació
+    #[view(getPollParticipationStats)]
+    fn get_poll_participation_stats(&self, poll_id: u64) -> (u64, Option<u64>) {
+        let poll = self.polls().get(poll_id).unwrap();
+
+        // Nombre de participants
+        let participant_count = if poll.can_change_vote {
+            // Si es pot canviar el vot, comptem els participants de "votes"
+            let votes = self.votes(&poll_id);
+            votes.len()
+        } else {
+            // Si NO es pot canviar el vot, comptem els participants de "voted_addresses"
+            let voted_addresses = self.voted_addresses(&poll_id);
+            voted_addresses.len()
+        };
+
+        // Percentatge de participació
+        let participation_percentage = if let Some(whitelist) = &poll.whitelisted_addresses {
+            // Si hi ha cens, es calcula respecte al cens
+            let total_cens = whitelist.len();
+            Some(participant_count * 100 / total_cens)
+        } else {
+            None
+        };
+        
+        (participant_count, participation_percentage)
+    }
+
     // Storage
     #[storage_mapper("polls")]
     fn polls(&self) -> MapMapper<Self::Api, u64, Poll<Self::Api>>;
