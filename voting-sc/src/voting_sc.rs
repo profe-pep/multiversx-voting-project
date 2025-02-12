@@ -235,6 +235,28 @@ pub trait VotingContract {
         self.polls().get(poll_id).unwrap()
     }
 
+    // Consultar resultats agregats d'una votació
+    #[view(getPollResults)]
+    fn get_poll_results(&self, poll_id: u64) -> MultiValueEncoded<(ManagedBuffer<Self::Api>, u64, u64)> {
+        let poll = self.polls().get(poll_id).unwrap();
+        let mut results = MultiValueEncoded::new();
+
+        // Calculem el total de vots
+        let total_votes: u64 = poll.options.iter().map(|option| option.vote_count).sum();
+
+        for option in poll.options.iter() {
+            let percentage = if total_votes > 0 {
+                option.vote_count * 100 / total_votes
+            } else {
+                0
+            };
+
+            results.push((option.name.clone(), option.vote_count, percentage));
+        }
+
+        results
+    }
+    
     // Storage
     #[storage_mapper("polls")]
     fn polls(&self) -> MapMapper<Self::Api, u64, Poll<Self::Api>>;
