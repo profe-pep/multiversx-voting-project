@@ -13,11 +13,12 @@ pub struct PollOption<M: ManagedTypeApi> {
 #[type_abi]
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode)]
 pub struct Poll<M: ManagedTypeApi> {
-    creator: ManagedAddress<M>,
+    id: u64,
     question: ManagedBuffer<M>,
     options: ManagedVec<M, PollOption<M>>,
     start_time: u64,
     end_time: u64,
+    creator: ManagedAddress<M>,
     is_closed: bool,
     can_change_vote: bool, // Afegit per permetre canviar el vot
     whitelisted_addresses: Option<ManagedVec<M, ManagedAddress<M>>>, // Cens opcional
@@ -27,7 +28,7 @@ pub struct Poll<M: ManagedTypeApi> {
 pub trait VotingContract {
     #[init]
     fn init(&self) {
-        self.total_polls().set(0u64);
+        self.last_poll_id().set(0u64);
     }
 
     // Crear una nova votació
@@ -63,12 +64,15 @@ pub trait VotingContract {
 
         }
 
+        let poll_id = self.last_poll_id().get();
+
         let poll = Poll {
-            creator: self.blockchain().get_caller(),
+            id: poll_id,
             question,
             options: poll_options,
             start_time,
             end_time,
+            creator: self.blockchain().get_caller(),
             is_closed: false,
             can_change_vote,
             whitelisted_addresses: match voter_whitelist {
@@ -77,9 +81,8 @@ pub trait VotingContract {
             }
         };
 
-        let poll_id = self.total_polls().get();
         self.polls().insert(poll_id, poll);
-        self.total_polls().set(poll_id + 1);
+        self.last_poll_id().set(poll_id + 1);
     }
 
     // Votar en una opció
@@ -114,25 +117,15 @@ pub trait VotingContract {
 
         if poll.can_change_vote {
             // Si es pot canviar el vot, utilitzem "votes"
-            let mut votes = self.votes(&poll_id);
+            let mut votes = self.votes(poll_id);
 
             if let Some(previous_vote) = votes.get(&caller) {
                 // Si ja ha votat, restem el vot de l'opció anterior
-                let mut previous_option = poll.options.get(previous_vote).clone();
-                require!(
-                    previous_option.vote_count > 0,
-                    "Error en el recompte de vots."
-                );
-                previous_option.vote_count -= 1;
-                poll.options.set(previous_vote, previous_option)
-                    .expect("No s'ha pogut actualitzar el vot");
+                self.remove_vote(&mut poll, previous_vote);
             }
 
             // Afegim el nou vot
-            let mut selected_option = poll.options.get(option_index).clone();
-            selected_option.vote_count += 1;
-            poll.options.set(option_index, selected_option)
-                .expect("No s'ha pogut actualitzar el vot");
+            self.add_vote(&mut poll, option_index);
 
             // Guardem el nou vot
             votes.insert(caller, option_index);
@@ -145,18 +138,35 @@ pub trait VotingContract {
                 !voted_addresses.contains(&caller),
                 "Ja has votat i no es permet canviar el vot."
             );
-
-            // Afegim el vot
-            let mut selected_option = poll.options.get(option_index).clone();
-            selected_option.vote_count += 1;
-            poll.options.set(option_index, selected_option)
-                .expect("No s'ha pogut actualitzar el vot anterior");
+            
+            // Afegim el nou vot
+            self.add_vote(&mut poll, option_index);
 
             // Marquem que aquest usuari ha votat
             voted_addresses.insert(caller);
         }
 
         self.polls().insert(poll_id, poll);
+    }
+
+    // Helper
+    fn add_vote(&self, poll: &mut Poll<Self::Api>, option_index: usize) {
+        let mut selected_option = poll.options.get(option_index).clone();
+        selected_option.vote_count += 1;
+        poll.options.set(option_index, selected_option)
+            .expect("No s'ha pogut registrar el vot");
+    }
+
+    // Helper
+    fn remove_vote(&self, poll: &mut Poll<Self::Api>, option_index: usize) {
+        let mut selected_option = poll.options.get(option_index).clone();
+        require!(
+            selected_option.vote_count > 0,
+            "Error en el recompte de vots."
+        );
+        selected_option.vote_count -= 1;
+        poll.options.set(option_index, selected_option)
+            .expect("No s'ha pogut actualitzar el vot");
     }
 
     // Tancar anticipadament una votació (només el creador pot fer-ho)
@@ -283,7 +293,7 @@ pub trait VotingContract {
         // Nombre de participants
         let participant_count = if poll.can_change_vote {
             // Si es pot canviar el vot, comptem els participants de "votes"
-            let votes = self.votes(&poll_id);
+            let votes = self.votes(poll_id);
             votes.len()
         } else {
             // Si NO es pot canviar el vot, comptem els participants de "voted_addresses"
@@ -307,17 +317,12 @@ pub trait VotingContract {
     #[storage_mapper("polls")]
     fn polls(&self) -> MapMapper<Self::Api, u64, Poll<Self::Api>>;
 
-    #[storage_mapper("total_polls")]
-    fn total_polls(&self) -> SingleValueMapper<Self::Api, u64>;
+    #[storage_mapper("last_poll_id")]
+    fn last_poll_id(&self) -> SingleValueMapper<Self::Api, u64>;
 
     #[storage_mapper("voted_addresses")]
     fn voted_addresses(&self, poll_id: u64) -> UnorderedSetMapper<Self::Api, ManagedAddress<Self::Api>>;
 
     #[storage_mapper("votes")]
-    fn votes(&self, poll_id: &u64) -> MapMapper<ManagedAddress<Self::Api>, usize>;
-
-    // Helper
-    fn has_voted(&self, poll_id: u64, address: &ManagedAddress<Self::Api>) -> bool {
-        self.voted_addresses(poll_id).contains(address)
-    }
+    fn votes(&self, poll_id: u64) -> MapMapper<ManagedAddress<Self::Api>, usize>;
 }
