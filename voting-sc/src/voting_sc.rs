@@ -3,13 +3,15 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, ManagedVecItem)]
+#[type_abi]
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, ManagedVecItem, Clone)]
 pub struct PollOption<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     vote_count: u64,
 }
 
-#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi)]
+#[type_abi]
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode)]
 pub struct Poll<M: ManagedTypeApi> {
     creator: ManagedAddress<M>,
     question: ManagedBuffer<M>,
@@ -76,7 +78,7 @@ pub trait VotingContract {
         };
 
         let poll_id = self.total_polls().get();
-        self.polls().insert(poll_id, &poll);
+        self.polls().insert(poll_id, poll);
         self.total_polls().set(poll_id + 1);
     }
 
@@ -84,7 +86,7 @@ pub trait VotingContract {
     #[endpoint(castVote)]
     fn cast_vote(&self, poll_id: u64, option_index: usize) {
         let caller = self.blockchain().get_caller();
-        let mut poll = self.polls().get(poll_id).unwrap();
+        let mut poll = self.polls().get(&poll_id).unwrap();
 
         require!(
             !poll.is_closed,
@@ -105,7 +107,7 @@ pub trait VotingContract {
         // Comprovació de cens
         if let Some(whitelist) = &poll.whitelisted_addresses {
             require!(
-                whitelist.iter().any(|addr| addr == &caller), 
+                whitelist.iter().any(|addr| addr == (&caller).into()), 
                 "No estàs al cens de votants."
             );
         }
@@ -114,28 +116,30 @@ pub trait VotingContract {
             // Si es pot canviar el vot, utilitzem "votes"
             let mut votes = self.votes(&poll_id);
 
-            if let Some(&previous_vote) = votes.get(&caller) {
+            if let Some(previous_vote) = votes.get(&caller) {
                 // Si ja ha votat, restem el vot de l'opció anterior
-                let mut previous_option = poll.options.get(previous_vote);
+                let mut previous_option = poll.options.get(previous_vote).clone();
                 require!(
                     previous_option.vote_count > 0,
                     "Error en el recompte de vots."
                 );
                 previous_option.vote_count -= 1;
-                poll.options.set(previous_vote, &previous_option);
+                poll.options.set(previous_vote, previous_option)
+                    .expect("No s'ha pogut actualitzar el vot");
             }
 
             // Afegim el nou vot
-            let mut selected_option = poll.options.get(option_index);
+            let mut selected_option = poll.options.get(option_index).clone();
             selected_option.vote_count += 1;
-            poll.options.set(option_index, &selected_option);
+            poll.options.set(option_index, selected_option)
+                .expect("No s'ha pogut actualitzar el vot");
 
             // Guardem el nou vot
             votes.insert(caller, option_index);
 
         } else {
             // Si NO es pot canviar el vot, utilitzem "voted_addresses"
-            let mut voted_addresses = self.voted_addresses(&poll_id);
+            let mut voted_addresses = self.voted_addresses(poll_id);
 
             require!(
                 !voted_addresses.contains(&caller),
@@ -143,22 +147,23 @@ pub trait VotingContract {
             );
 
             // Afegim el vot
-            let mut selected_option = poll.options.get(option_index);
+            let mut selected_option = poll.options.get(option_index).clone();
             selected_option.vote_count += 1;
-            poll.options.set(option_index, &selected_option);
+            poll.options.set(option_index, selected_option)
+                .expect("No s'ha pogut actualitzar el vot anterior");
 
             // Marquem que aquest usuari ha votat
             voted_addresses.insert(caller);
         }
 
-        self.polls().insert(poll_id, &poll);
+        self.polls().insert(poll_id, poll);
     }
 
     // Tancar anticipadament una votació (només el creador pot fer-ho)
     #[endpoint(closePoll)]
     fn close_poll(&self, poll_id: u64) {
         let caller = self.blockchain().get_caller();
-        let mut poll = self.polls().get(poll_id).unwrap();
+        let mut poll = self.polls().get(&poll_id).unwrap();
         
         require!(
             poll.creator == caller,
@@ -166,7 +171,7 @@ pub trait VotingContract {
         );
 
         poll.is_closed = true;
-        self.polls().insert(poll_id, &poll);
+        self.polls().insert(poll_id, poll);
     }
 
     // Modificar una votació (només el creador pot fer-ho)
@@ -180,7 +185,7 @@ pub trait VotingContract {
         new_end_time: u64
     ) {
         let caller = self.blockchain().get_caller();
-        let mut poll = self.polls().get(poll_id).unwrap();
+        let mut poll = self.polls().get(&poll_id).unwrap();
         
         require!(
             poll.creator == caller,
@@ -239,19 +244,19 @@ pub trait VotingContract {
             poll.end_time = new_end_time;
         }
 
-        self.polls().insert(poll_id, &poll);
+        self.polls().insert(poll_id, poll);
     }
 
     // Consultar una votació i les seves opcions
     #[view(getPoll)]
     fn get_poll(&self, poll_id: u64) -> Poll<Self::Api> {
-        self.polls().get(poll_id).unwrap()
+        self.polls().get(&poll_id).unwrap()
     }
 
     // Consultar resultats agregats d'una votació
     #[view(getPollResults)]
     fn get_poll_results(&self, poll_id: u64) -> MultiValueEncoded<(ManagedBuffer<Self::Api>, u64, u64)> {
-        let poll = self.polls().get(poll_id).unwrap();
+        let poll = self.polls().get(&poll_id).unwrap();
         let mut results = MultiValueEncoded::new();
 
         // Calculem el total de vots
@@ -273,7 +278,7 @@ pub trait VotingContract {
     // Consultar estadístiques de participació d'una votació
     #[view(getPollParticipationStats)]
     fn get_poll_participation_stats(&self, poll_id: u64) -> (u64, Option<u64>) {
-        let poll = self.polls().get(poll_id).unwrap();
+        let poll = self.polls().get(&poll_id).unwrap();
 
         // Nombre de participants
         let participant_count = if poll.can_change_vote {
@@ -282,7 +287,7 @@ pub trait VotingContract {
             votes.len()
         } else {
             // Si NO es pot canviar el vot, comptem els participants de "voted_addresses"
-            let voted_addresses = self.voted_addresses(&poll_id);
+            let voted_addresses = self.voted_addresses(poll_id);
             voted_addresses.len()
         };
 
@@ -295,7 +300,7 @@ pub trait VotingContract {
             None
         };
         
-        (participant_count, participation_percentage)
+        (participant_count.try_into().unwrap(), participation_percentage.map(|p| p.try_into().unwrap()))
     }
 
     // Storage
