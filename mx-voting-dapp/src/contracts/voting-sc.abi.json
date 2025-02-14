@@ -1,0 +1,215 @@
+{
+    "buildInfo": {
+        "rustc": {
+            "version": "1.84.1",
+            "commitHash": "e71f9a9a98b0faf423844bf0ba7438f29dc27d58",
+            "commitDate": "2025-01-27",
+            "channel": "Stable",
+            "short": "rustc 1.84.1 (e71f9a9a9 2025-01-27)"
+        },
+        "contractCrate": {
+            "name": "voting-sc",
+            "version": "0.0.0"
+        },
+        "framework": {
+            "name": "multiversx-sc",
+            "version": "0.56.1"
+        }
+    },
+    "name": "VotingContract",
+    "constructor": {
+        "inputs": [],
+        "outputs": []
+    },
+    "endpoints": [
+        {
+            "name": "createPoll",
+            "mutability": "mutable",
+            "inputs": [
+                {
+                    "name": "question",
+                    "type": "bytes"
+                },
+                {
+                    "name": "options",
+                    "type": "List<bytes>"
+                },
+                {
+                    "name": "start_time",
+                    "type": "u64"
+                },
+                {
+                    "name": "end_time",
+                    "type": "u64"
+                },
+                {
+                    "name": "can_change_vote",
+                    "type": "bool"
+                },
+                {
+                    "name": "voter_whitelist",
+                    "type": "optional<List<Address>>",
+                    "multi_arg": true
+                }
+            ],
+            "outputs": []
+        },
+        {
+            "name": "castVote",
+            "mutability": "mutable",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                },
+                {
+                    "name": "option_index",
+                    "type": "u32"
+                }
+            ],
+            "outputs": []
+        },
+        {
+            "name": "closePoll",
+            "mutability": "mutable",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                }
+            ],
+            "outputs": []
+        },
+        {
+            "name": "modifyPoll",
+            "mutability": "mutable",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                },
+                {
+                    "name": "new_question",
+                    "type": "bytes"
+                },
+                {
+                    "name": "new_options",
+                    "type": "List<bytes>"
+                },
+                {
+                    "name": "new_start_time",
+                    "type": "u64"
+                },
+                {
+                    "name": "new_end_time",
+                    "type": "u64"
+                }
+            ],
+            "outputs": []
+        },
+        {
+            "name": "getPoll",
+            "mutability": "readonly",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "Poll"
+                }
+            ]
+        },
+        {
+            "name": "getPollResults",
+            "mutability": "readonly",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "variadic<tuple<bytes,u64,u64>>",
+                    "multi_result": true
+                }
+            ]
+        },
+        {
+            "name": "getPollParticipationStats",
+            "mutability": "readonly",
+            "inputs": [
+                {
+                    "name": "poll_id",
+                    "type": "u64"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "tuple<u64,Option<u64>>"
+                }
+            ]
+        }
+    ],
+    "esdtAttributes": [],
+    "hasCallback": false,
+    "types": {
+        "Poll": {
+            "type": "struct",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "u64"
+                },
+                {
+                    "name": "question",
+                    "type": "bytes"
+                },
+                {
+                    "name": "options",
+                    "type": "List<PollOption>"
+                },
+                {
+                    "name": "start_time",
+                    "type": "u64"
+                },
+                {
+                    "name": "end_time",
+                    "type": "u64"
+                },
+                {
+                    "name": "creator",
+                    "type": "Address"
+                },
+                {
+                    "name": "is_closed",
+                    "type": "bool"
+                },
+                {
+                    "name": "can_change_vote",
+                    "type": "bool"
+                },
+                {
+                    "name": "whitelisted_addresses",
+                    "type": "Option<List<Address>>"
+                }
+            ]
+        },
+        "PollOption": {
+            "type": "struct",
+            "fields": [
+                {
+                    "name": "name",
+                    "type": "bytes"
+                },
+                {
+                    "name": "vote_count",
+                    "type": "u64"
+                }
+            ]
+        }
+    }
+}
