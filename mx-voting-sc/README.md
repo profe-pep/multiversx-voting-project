@@ -113,7 +113,7 @@ To upgrade a deployed contract:
      --proxy=https://devnet-gateway.multiversx.com \
      --chain D \
      --recall-nonce \
-     --gas-limit 5000000 \
+     --gas-limit 50000000 \
      --keyfile="./<your-wallet-keyfile>.json" \
      --send
    ```

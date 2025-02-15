@@ -55,30 +55,38 @@
             "outputs": []
         },
         {
-            "name": "castVote",
-            "mutability": "mutable",
+            "name": "getPolls",
+            "mutability": "readonly",
             "inputs": [
                 {
-                    "name": "poll_id",
-                    "type": "u64"
+                    "name": "status_filter",
+                    "type": "Option<PollStatus>"
                 },
                 {
-                    "name": "option_index",
-                    "type": "u32"
+                    "name": "creator_filter",
+                    "type": "Option<Address>"
                 }
             ],
-            "outputs": []
+            "outputs": [
+                {
+                    "type": "List<Poll>"
+                }
+            ]
         },
         {
-            "name": "closePoll",
-            "mutability": "mutable",
+            "name": "getPoll",
+            "mutability": "readonly",
             "inputs": [
                 {
                     "name": "poll_id",
                     "type": "u64"
                 }
             ],
-            "outputs": []
+            "outputs": [
+                {
+                    "type": "Poll"
+                }
+            ]
         },
         {
             "name": "modifyPoll",
@@ -108,19 +116,30 @@
             "outputs": []
         },
         {
-            "name": "getPoll",
-            "mutability": "readonly",
+            "name": "closePoll",
+            "mutability": "mutable",
             "inputs": [
                 {
                     "name": "poll_id",
                     "type": "u64"
                 }
             ],
-            "outputs": [
+            "outputs": []
+        },
+        {
+            "name": "castVote",
+            "mutability": "mutable",
+            "inputs": [
                 {
-                    "type": "Poll"
+                    "name": "poll_id",
+                    "type": "u64"
+                },
+                {
+                    "name": "option_index",
+                    "type": "u32"
                 }
-            ]
+            ],
+            "outputs": []
         },
         {
             "name": "getPollResults",
@@ -208,6 +227,23 @@
                 {
                     "name": "vote_count",
                     "type": "u64"
+                }
+            ]
+        },
+        "PollStatus": {
+            "type": "enum",
+            "variants": [
+                {
+                    "name": "NotStarted",
+                    "discriminant": 0
+                },
+                {
+                    "name": "Ongoing",
+                    "discriminant": 1
+                },
+                {
+                    "name": "Ended",
+                    "discriminant": 2
                 }
             ]
         }

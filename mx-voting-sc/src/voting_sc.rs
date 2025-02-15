@@ -11,7 +11,7 @@ pub struct PollOption<M: ManagedTypeApi> {
 }
 
 #[type_abi]
-#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode)]
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, ManagedVecItem)]
 pub struct Poll<M: ManagedTypeApi> {
     id: u64,
     question: ManagedBuffer<M>,
@@ -22,6 +22,14 @@ pub struct Poll<M: ManagedTypeApi> {
     is_closed: bool,
     can_change_vote: bool, // Afegit per permetre canviar el vot
     whitelisted_addresses: Option<ManagedVec<M, ManagedAddress<M>>>, // Cens opcional
+}
+
+#[type_abi]
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq)]
+pub enum PollStatus {
+    NotStarted,
+    Ongoing,
+    Ended,
 }
 
 #[multiversx_sc::contract]
@@ -83,6 +91,136 @@ pub trait VotingContract {
 
         self.polls().insert(poll_id, poll);
         self.last_poll_id().set(poll_id + 1);
+    }
+
+    // Obtenir votacions
+    #[view(getPolls)]
+    fn get_polls(
+        &self, 
+        status_filter: Option<PollStatus>, 
+        creator_filter: Option<ManagedAddress<Self::Api>>
+    ) -> ManagedVec<Self::Api, Poll<Self::Api>> {
+        let current_time = self.blockchain().get_block_timestamp();
+        let mut filtered_polls = ManagedVec::new();
+    
+        for (_id, poll) in self.polls().iter() {
+            // Filtrar per estat si s'ha especificat
+            if let Some(status) = &status_filter {
+                let status_match = match status {
+                    PollStatus::NotStarted => current_time < poll.start_time,
+                    PollStatus::Ongoing => current_time >= poll.start_time && current_time <= poll.end_time,
+                    PollStatus::Ended => current_time > poll.end_time,
+                };
+                if !status_match {
+                    continue;
+                }
+            }
+    
+            // Filtrar per creador si s'ha especificat
+            if let Some(creator) = &creator_filter {
+                if poll.creator != *creator {
+                    continue;
+                }
+            }
+    
+            filtered_polls.push(poll);
+        }
+    
+        filtered_polls
+    }
+    
+    // Consultar una votació i les seves opcions
+    #[view(getPoll)]
+    fn get_poll(&self, poll_id: u64) -> Poll<Self::Api> {
+        self.polls().get(&poll_id).unwrap()
+    }
+
+    // Modificar una votació (només el creador pot fer-ho)
+    #[endpoint(modifyPoll)]
+    fn modify_poll(
+        &self,
+        poll_id: u64,
+        new_question: ManagedBuffer<Self::Api>,
+        new_options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
+        new_start_time: u64,
+        new_end_time: u64
+    ) {
+        let caller = self.blockchain().get_caller();
+        let mut poll = self.polls().get(&poll_id).unwrap();
+        
+        require!(
+            poll.creator == caller,
+            "Només el creador pot modificar aquesta votació."
+        );
+
+        require!(
+            !poll.is_closed,
+            "No es pot modificar una votació tancada."
+        );
+
+        // Comprova l'estat de la votació
+        let current_time = self.blockchain().get_block_timestamp();
+        let has_started = current_time >= poll.start_time;
+        let has_ended = current_time > poll.end_time;
+
+        if has_started {
+            // Si la votació ha començat, només permet modificar la data de fi
+            require!(
+                !has_ended,
+                "No es pot modificar una votació que ja ha finalitzat."
+            );
+
+            require!(
+                new_end_time > current_time,
+                "La nova data de fi ha de ser al futur per allargar la votació."
+            );
+
+            poll.end_time = new_end_time;
+        } else {
+            // Si la votació encara no ha començat, permet modificar tot
+            require!(
+                new_options.len() > 1, 
+                "Almenys han d'haver dues opcions"
+            );
+            require!(
+                new_end_time > new_start_time, 
+                "La data de fi ha de ser després de la d'inici"
+            );
+            require!(
+                new_end_time > current_time, 
+                "La data de fi ha de ser al futur"
+            );
+
+            poll.question = new_question;
+            poll.options.clear();
+
+            for option in new_options.iter() {
+                poll.options.push(PollOption {
+                    name: option.clone_value(),
+                    vote_count: 0,  // Es reinicia el recompte
+                });
+            }
+
+            poll.start_time = new_start_time;
+            poll.end_time = new_end_time;
+        }
+
+        self.polls().insert(poll_id, poll);
+    }
+
+    // Tancar anticipadament una votació (només el creador pot fer-ho)
+    #[endpoint(closePoll)]
+    fn close_poll(&self, poll_id: u64) {
+        let caller = self.blockchain().get_caller();
+        let mut poll = self.polls().get(&poll_id).unwrap();
+        
+        require!(
+            poll.creator == caller,
+            "Només el creador pot tancar aquesta votació."
+        );
+
+        poll.is_closed = true;
+        self.polls().insert(poll_id, poll);
     }
 
     // Votar en una opció
@@ -167,100 +305,6 @@ pub trait VotingContract {
         selected_option.vote_count -= 1;
         poll.options.set(option_index, selected_option)
             .expect("No s'ha pogut actualitzar el vot");
-    }
-
-    // Tancar anticipadament una votació (només el creador pot fer-ho)
-    #[endpoint(closePoll)]
-    fn close_poll(&self, poll_id: u64) {
-        let caller = self.blockchain().get_caller();
-        let mut poll = self.polls().get(&poll_id).unwrap();
-        
-        require!(
-            poll.creator == caller,
-            "Només el creador pot tancar aquesta votació."
-        );
-
-        poll.is_closed = true;
-        self.polls().insert(poll_id, poll);
-    }
-
-    // Modificar una votació (només el creador pot fer-ho)
-    #[endpoint(modifyPoll)]
-    fn modify_poll(
-        &self,
-        poll_id: u64,
-        new_question: ManagedBuffer<Self::Api>,
-        new_options: ManagedVec<Self::Api, ManagedBuffer<Self::Api>>,
-        new_start_time: u64,
-        new_end_time: u64
-    ) {
-        let caller = self.blockchain().get_caller();
-        let mut poll = self.polls().get(&poll_id).unwrap();
-        
-        require!(
-            poll.creator == caller,
-            "Només el creador pot modificar aquesta votació."
-        );
-
-        require!(
-            !poll.is_closed,
-            "No es pot modificar una votació tancada."
-        );
-
-        // Comprova l'estat de la votació
-        let current_time = self.blockchain().get_block_timestamp();
-        let has_started = current_time >= poll.start_time;
-        let has_ended = current_time > poll.end_time;
-
-        if has_started {
-            // Si la votació ha començat, només permet modificar la data de fi
-            require!(
-                !has_ended,
-                "No es pot modificar una votació que ja ha finalitzat."
-            );
-
-            require!(
-                new_end_time > current_time,
-                "La nova data de fi ha de ser al futur per allargar la votació."
-            );
-
-            poll.end_time = new_end_time;
-        } else {
-            // Si la votació encara no ha començat, permet modificar tot
-            require!(
-                new_options.len() > 1, 
-                "Almenys han d'haver dues opcions"
-            );
-            require!(
-                new_end_time > new_start_time, 
-                "La data de fi ha de ser després de la d'inici"
-            );
-            require!(
-                new_end_time > current_time, 
-                "La data de fi ha de ser al futur"
-            );
-
-            poll.question = new_question;
-            poll.options.clear();
-
-            for option in new_options.iter() {
-                poll.options.push(PollOption {
-                    name: option.clone_value(),
-                    vote_count: 0,  // Es reinicia el recompte
-                });
-            }
-
-            poll.start_time = new_start_time;
-            poll.end_time = new_end_time;
-        }
-
-        self.polls().insert(poll_id, poll);
-    }
-
-    // Consultar una votació i les seves opcions
-    #[view(getPoll)]
-    fn get_poll(&self, poll_id: u64) -> Poll<Self::Api> {
-        self.polls().get(&poll_id).unwrap()
     }
 
     // Consultar resultats agregats d'una votació
