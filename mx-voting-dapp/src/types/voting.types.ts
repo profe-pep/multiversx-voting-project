@@ -15,3 +15,9 @@ export type Poll = {
   can_change_vote: boolean; // Afegit per permetre canviar el vot
   whitelisted_addresses?: string[]; // Cens opcional
 };
+
+export enum PollStatus {
+  NotStarted = 0,
+  Ongoing = 1,
+  Ended = 2
+}
