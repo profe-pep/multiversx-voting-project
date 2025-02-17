@@ -1,5 +1,5 @@
 import { RouteNamesEnum } from 'localConstants';
-import { Dashboard, Disclaimer, Home, Polls } from 'pages';
+import { Dashboard, Disclaimer, Home, ListPolls, GetPoll } from 'pages';
 import { RouteType } from 'types';
 
 interface RouteWithTitleType extends RouteType {
@@ -25,6 +25,12 @@ export const routes: RouteWithTitleType[] = [
   {
     path: RouteNamesEnum.listPolls,
     title: 'Polls',
-    component: Polls
+    component: ListPolls
+  },
+  {
+    path: RouteNamesEnum.getPoll,
+    title: 'Poll',
+    component: GetPoll
   }
+
 ];

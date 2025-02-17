@@ -22,7 +22,7 @@ import {
   BytesValue,
   OptionalValue,
 } from '@multiversx/sdk-core';
-import { Poll, PollStatus } from 'types';
+import { PollStatus } from 'types';
 
 const resultsParser = new ResultsParser();
 
@@ -34,9 +34,6 @@ export const useVotingContract = (
   const { network } = useGetNetworkConfig();
   const proxy = new ProxyNetworkProvider(network.apiAddress);
 
-  const [polls, setPolls] = useState<any[]>([]);
-  const [poll, setPoll] = useState<any|undefined>(undefined);
-  
   interface CreatePollParams {
     question: string;
     options: string[];
@@ -130,7 +127,6 @@ export const useVotingContract = (
       );
   
       console.log('Polls:', polls?.valueOf());
-      setPoll(polls?.valueOf());
       return polls;
     } catch (err) {
       console.error('Unable to call getPolls', err);
@@ -159,7 +155,6 @@ export const useVotingContract = (
       );
   
       console.log('Poll:', poll?.valueOf());
-      setPoll(poll?.valueOf());
       return poll;
     } catch (err) {
       console.error('Unable to call getPoll', err);
@@ -169,16 +164,12 @@ export const useVotingContract = (
     
 
   useEffect(() => {
-    getPolls(0);
-    getPoll(0);
+
   }, [balance]);
 
   return {
-    // State
-    polls,
-    setPolls,
-    poll,
-    // API
-    createPoll
+    createPoll,
+    getPolls,
+    getPoll,
   };
 };

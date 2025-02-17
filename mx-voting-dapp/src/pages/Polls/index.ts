@@ -1,1 +1,2 @@
-export * from './Polls';
+export * from './ListPolls';
+export * from './GetPoll';

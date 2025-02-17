@@ -5,6 +5,6 @@ export enum RouteNamesEnum {
   disclaimer = '/disclaimer',
   listPolls = '/polls',
   createPoll = '/polls/create',
-  readPoll = '/polls/:id',
+  getPoll = '/polls/:id',
   castVote = '/polls/:id/vote'
 }
