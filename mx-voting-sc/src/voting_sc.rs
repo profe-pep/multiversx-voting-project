@@ -39,6 +39,11 @@ pub trait VotingContract {
         self.last_poll_id().set(0u64);
     }
 
+    #[upgrade]
+    fn upgrade(&self) {
+        // New endpoints with same storages
+    }
+
     // Crear una nova votació
     #[endpoint(createPoll)]
     fn create_poll(

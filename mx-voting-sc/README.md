@@ -89,11 +89,11 @@ mxpy --verbose contract deploy \
   --proxy=https://devnet-gateway.multiversx.com \
   --abi ./output/voting-sc.abi.json \
   --gas-limit 500000000 \
-  --keyfile="./<your-wallet-keyfile>.json" \
+  --pem="./<your-wallet>.pem" \
   --send
 ```
 
-Replace `<your-wallet-keyfile>.json` with your wallet keyfile name. Note the contract address after successful deployment.
+Replace `<your-wallet>.pem` with your wallet file name. Note the contract address after successful deployment.
 
 ---
 
@@ -114,7 +114,7 @@ To upgrade a deployed contract:
      --chain D \
      --recall-nonce \
      --gas-limit 50000000 \
-     --keyfile="./<your-wallet-keyfile>.json" \
+     --pem="./<your-wallet>.pem" \
      --send
    ```
 
@@ -129,7 +129,7 @@ mxpy contract call erd1<your-contract-address> \
   --function create_poll \ 
   --arguments-file ./src/arguments_examples/create_poll_arguments.json \ 
   --proxy https://devnet-gateway.multiversx.com \ 
-  --keyfile "./<your-wallet-keyfile>.json" \ 
+  --pem "./<your-wallet>.pem" \ 
   --send
 ```
 
@@ -139,7 +139,7 @@ mxpy contract call erd1<your-contract-address> \
   --function cast_vote \ 
   --arguments-file ./src/arguments_examples/cast_vote_arguments.json \ 
   --proxy https://devnet-gateway.multiversx.com \ 
-  --keyfile "./<your-wallet-keyfile>.json" \ 
+  --pem "./<your-wallet>.pem" \ 
   --send
 ```
 
