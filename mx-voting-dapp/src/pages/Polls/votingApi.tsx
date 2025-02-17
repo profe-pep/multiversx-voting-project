@@ -16,7 +16,7 @@ import {
 } from '@multiversx/sdk-core/out';
 import {
   List,
-  U32Value,
+  U8Value,
   U64Value,
   BooleanValue,
   BytesValue,
@@ -34,7 +34,8 @@ export const useVotingContract = (
   const { network } = useGetNetworkConfig();
   const proxy = new ProxyNetworkProvider(network.apiAddress);
 
-  const [polls, setPolls] = useState<Poll[]>([]);
+  const [polls, setPolls] = useState<any[]>([]);
+  const [poll, setPoll] = useState<any|undefined>(undefined);
   
   interface CreatePollParams {
     question: string;
@@ -107,19 +108,15 @@ export const useVotingContract = (
   };
   
   const getPolls = async (
-    statusFilter?: PollStatus, // Optional
-    creatorFilter?: string     // Optional
+    statusFilter?: PollStatus // Optional
   ) => {
     try {
       const query = smartContract.createQuery({
         func: new ContractFunction('getPolls'),
         args: [
-          statusFilter 
-            ? new OptionalValue(new U32Value(statusFilter)) 
-            : OptionalValue.newMissing(),
-          creatorFilter 
-            ? new AddressValue(new Address(creatorFilter)) 
-            : OptionalValue.newMissing()
+          statusFilter !== undefined
+            ? new U8Value(statusFilter) // Si està definit, el convertim a U8Value
+            : OptionalValue.newMissing() // Si no està definit, passem Missing
         ]
       });
   
@@ -132,23 +129,55 @@ export const useVotingContract = (
         endpointDefinition
       );
   
-      console.log('Polls:', polls);
+      console.log('Polls:', polls?.valueOf());
+      setPoll(polls?.valueOf());
       return polls;
     } catch (err) {
       console.error('Unable to call getPolls', err);
       return [];
     }
   };
+
+  const getPoll = async (
+    id: number,
+  ) => {
+    try {
+      const query = smartContract.createQuery({
+        func: new ContractFunction('getPoll'),
+        args: [
+          new U64Value(id)
+        ]
+      });
+  
+      const queryResponse = await proxy.queryContract(query);
+  
+      const endpointDefinition = smartContract.getEndpoint('getPoll');
+  
+      const { firstValue: poll } = resultsParser.parseQueryResponse(
+        queryResponse,
+        endpointDefinition
+      );
+  
+      console.log('Poll:', poll?.valueOf());
+      setPoll(poll?.valueOf());
+      return poll;
+    } catch (err) {
+      console.error('Unable to call getPoll', err);
+      return [];
+    }
+  };
     
 
   useEffect(() => {
-    getPolls();
+    getPolls(0);
+    getPoll(0);
   }, [balance]);
 
   return {
     // State
     polls,
     setPolls,
+    poll,
     // API
     createPoll
   };

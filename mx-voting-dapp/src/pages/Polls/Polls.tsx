@@ -11,42 +11,48 @@ export const Polls = () => {
   const { address, balance } = useGetAccount();
   const {
     polls,
-    createPoll
+    poll
   } = useVotingContract(address, balance);
   
   return (
     <AuthRedirectWrapper>
+      <div className='flex flex-col gap-6 max-w-3xl w-full'>
       <ContractAddress />      
-      { polls.length > 0 ? ({
+      { polls && polls.length > 0 ? (
         polls.map((poll) => {
           return (
             <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-bold">Poll Question</h2>
-                <p className="text-gray-700">{poll.question}</p>
+              <div className="rounded-xl bg-white p-6">
+                <h2 className="text-xl font-bold">Poll {poll.id && poll.id.toFixed()}</h2>
+                <p className="font-semibold mt-4">Question:</p>
+                <p>{poll.question.toString()}</p>
+                <p className="font-semibold mt-4">Options:</p>
+                <ol className="list-[upper-alpha] list-inside">
+                  {poll.options.map((option:any) => (
+                      <li key={option.name.toString()}>{option.name.toString()}</li>
+                  ))}
+                </ol>
               </div>
-      
-              <div>
-                <h3 className="text-lg font-semibold">Options</h3>
-                <ul className="list-disc ml-5">                    
-                  { poll.options.length > 0 ? (
-                      poll.options.map((option, index) => (
-                        <li key={index} className="my-2">
-                          {option}
-                        </li>
-                      ))
-                  ) : (
-                      <p>No options!</p>
-                  )}
-                </ul>
-              </div>        
             </div>
           )
-        })}
-
+        })
       ):(
         <p>No polls</p>
       )}
+      {poll && (
+        <div className="rounded-xl bg-white p-6">
+          <h2 className="text-xl font-bold">Poll {poll.id && poll.id.toFixed()}</h2>
+          <p className="font-semibold mt-4">Question:</p>
+          <p>{poll.question.toString()}</p>
+          <p className="font-semibold mt-4">Options:</p>
+          <ol className="list-[upper-alpha] list-inside">
+            {poll.options.map((option:any) => (
+                <li key={option.name.toString()}>{option.name.toString()}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+      </div>
     </AuthRedirectWrapper>
   );
 };
