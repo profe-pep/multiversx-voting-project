@@ -1,11 +1,11 @@
 {
     "buildInfo": {
         "rustc": {
-            "version": "1.84.1",
-            "commitHash": "e71f9a9a98b0faf423844bf0ba7438f29dc27d58",
-            "commitDate": "2025-01-27",
+            "version": "1.82.0",
+            "commitHash": "f6e511eec7342f59a25f7c0534f1dbea00d01b14",
+            "commitDate": "2024-10-15",
             "channel": "Stable",
-            "short": "rustc 1.84.1 (e71f9a9a9 2025-01-27)"
+            "short": "rustc 1.82.0 (f6e511eec 2024-10-15)"
         },
         "contractCrate": {
             "name": "voting-sc",
@@ -13,7 +13,7 @@
         },
         "framework": {
             "name": "multiversx-sc",
-            "version": "0.56.1"
+            "version": "0.54.6"
         }
     },
     "name": "VotingContract",
@@ -65,12 +65,33 @@
                 {
                     "name": "status_filter",
                     "type": "Option<PollStatus>"
-                },
-                {
-                    "name": "creator_filter",
-                    "type": "Option<Address>"
                 }
             ],
+            "outputs": [
+                {
+                    "type": "List<Poll>"
+                }
+            ]
+        },
+        {
+            "name": "getUserPolls",
+            "mutability": "readonly",
+            "inputs": [
+                {
+                    "name": "creator_filter",
+                    "type": "Address"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "List<Poll>"
+                }
+            ]
+        },
+        {
+            "name": "getMyPolls",
+            "mutability": "readonly",
+            "inputs": [],
             "outputs": [
                 {
                     "type": "List<Poll>"
@@ -253,3 +274,4 @@
         }
     }
 }
+

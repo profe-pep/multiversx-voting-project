@@ -125,29 +125,70 @@ To upgrade a deployed contract:
 ### Call
 Example 1: Create a poll.
 ```bash
-mxpy contract call erd1<your-contract-address> \ 
-  --function create_poll \ 
-  --arguments-file ./src/arguments_examples/create_poll_arguments.json \ 
-  --proxy https://devnet-gateway.multiversx.com \ 
-  --pem "./<your-wallet>.pem" \ 
+mxpy contract call erd1<your-contract-address> \
+  --proxy=https://devnet-gateway.multiversx.com --recall-nonce \
+  --abi ./output/voting-sc.abi.json \
+  --arguments-file ./src/arguments_examples/create_poll_arguments.json \
+  --function createPoll \
+  --gas-limit 10_000_000 \
+  --pem="./<your-wallet>.pem" \
   --send
 ```
 
 Example 2: Cast a vote for an option.
 ```bash
-mxpy contract call erd1<your-contract-address> \ 
-  --function cast_vote \ 
-  --arguments-file ./src/arguments_examples/cast_vote_arguments.json \ 
-  --proxy https://devnet-gateway.multiversx.com \ 
-  --pem "./<your-wallet>.pem" \ 
+mxpy contract call erd1<your-contract-address> \
+  --function cast_vote \
+  --arguments-file ./src/arguments_examples/cast_vote_arguments.json \
+  --proxy https://devnet-gateway.multiversx.com \
+  --pem "./<your-wallet>.pem" \
   --send
 ```
 
 ### Query
-Example 3: Fetch the current poll question.
+
+Example 3: Fetch all polls.
+
+L'argument de `getPolls` és opcional (Option<PollStatus>) i la codificació segueix el següent patró:
+
+ - None = 0x00
+ - Some(valor) = 0x01 seguit del valor codificat de PollStatus (00, 01 o 02)
+
 ```bash
-mxpy contract query erd1<your-contract-address> \ 
-  --function getPollQuestion \ 
-  --arguments u64:1 \ 
+mxpy contract query erd1<your-contract-address> \
+  --function getPolls \
+  --arguments 0x00 \
+  --proxy https://devnet-gateway.multiversx.com
+```
+
+Example 3A: Fetch all "NotStarted" polls.
+```bash
+mxpy contract query erd1<your-contract-address> \
+  --function getPolls \
+  --arguments 0x0100 \
+  --proxy https://devnet-gateway.multiversx.com
+```
+
+Example 3B: Fetch all "Ongoing" polls.
+```bash
+mxpy contract query erd1<your-contract-address> \
+  --function getPolls \
+  --arguments 0x0101 \
+  --proxy https://devnet-gateway.multiversx.com
+```
+
+Example 3C: Fetch all "Ended" polls.
+```bash
+mxpy contract query erd1<your-contract-address> \
+  --function getPolls \
+  --arguments 0x0102 \
+  --proxy https://devnet-gateway.multiversx.com
+```
+
+Example 4: Fetch poll with id 0.
+```bash
+mxpy contract query erd1<your-contract-address> \
+  --function getPoll \
+  --arguments 0 \
   --proxy https://devnet-gateway.multiversx.com
 ```

@@ -102,6 +102,28 @@ pub trait VotingContract {
     #[view(getPolls)]
     fn get_polls(
         &self, 
+        status_filter: Option<PollStatus>
+    ) -> ManagedVec<Self::Api, Poll<Self::Api>> {
+        self.get_filtered_polls(status_filter, None)
+    }
+    
+    #[view(getUserPolls)]
+    fn get_user_polls(
+        &self, 
+        creator_filter: ManagedAddress<Self::Api>
+    ) -> ManagedVec<Self::Api, Poll<Self::Api>> {
+        self.get_filtered_polls(None, Some(creator_filter))
+    }
+    
+    #[view(getMyPolls)]
+    fn get_my_polls(&self) -> ManagedVec<Self::Api, Poll<Self::Api>> {
+        let creator_filter = self.blockchain().get_caller();
+        self.get_user_polls(creator_filter)
+    }   
+
+    // Helper
+    fn get_filtered_polls(
+        &self, 
         status_filter: Option<PollStatus>, 
         creator_filter: Option<ManagedAddress<Self::Api>>
     ) -> ManagedVec<Self::Api, Poll<Self::Api>> {
@@ -375,3 +397,4 @@ pub trait VotingContract {
     #[storage_mapper("votes")]
     fn votes(&self, poll_id: u64) -> MapMapper<ManagedAddress<Self::Api>, usize>;
 }
+
