@@ -23,5 +23,3 @@ export const pollEnded = (poll: Poll) : boolean => {
   const end_time = Number(poll.end_time) * 1000;
   return end_time < now;
 };
-
-const 
