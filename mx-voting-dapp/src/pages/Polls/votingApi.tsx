@@ -162,14 +162,47 @@ export const useVotingContract = (
     }
   };
     
+  const castVote = async (pollId: number, pollOption: number) => {
+    if (!userAddress) {
+      console.error('No user address');
+      return;
+    }
 
-  useEffect(() => {
+    const factoryConfig = new TransactionsFactoryConfig({
+      chainID: network.chainId
+    });
 
-  }, [balance]);
+    let factory = new SmartContractTransactionsFactory({
+      config: factoryConfig,
+      abi
+    });
+
+    const transaction = factory.createTransactionForExecute({
+      sender: new Address(userAddress),
+      contract: new Address(contractAddress),
+      function: 'castVote',
+      gasLimit: BigInt(10000000),
+      arguments: [
+        new U64Value(pollId),
+        new U8Value(pollOption) // Si el valor pot ser gran, utilitza U64Value aquí també
+      ]
+    });
+
+    const sessionId = await signAndSendTransactions({
+      transactions: [transaction],
+      callbackRoute: '',
+      transactionsDisplayInfo: {
+        processingMessage: `Voting choosen option in poll ${pollId}...`,
+        errorMessage: 'Error during vote process :-(',
+        successMessage: 'Vote successfully stored!'
+      }
+    });
+  };
 
   return {
     createPoll,
     getPolls,
     getPoll,
+    castVote,
   };
 };

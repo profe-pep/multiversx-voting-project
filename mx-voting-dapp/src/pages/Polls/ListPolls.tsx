@@ -46,14 +46,15 @@ export const ListPolls = () => {
               <p>{poll.question.toString()}</p>
               <p className="font-semibold mt-4">Options:</p>
               <ol className="list-[upper-alpha] list-inside">
-                {poll.options.map((option:any) => (
-                    <li key={option.name.toString()}>{option.name.toString()}</li>
+                { poll.options.map((option:any, index) => (
+                  <li key={index}>{option.name.toString()}</li>
                 ))}
               </ol>
               <p className="font-semibold mt-4">Voting period:</p>
               <p>Start at {formatDate(poll.start_time)}</p> 
               <p>Ends at {formatDate(poll.end_time)}</p>
-              <p className="mt-4">
+              <p className="font-semibold mt-4">Status:</p>
+              <p>
               { pollNotStarted(poll) && (
                 <Badge>Not started</Badge>
               )}
