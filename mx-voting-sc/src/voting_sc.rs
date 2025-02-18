@@ -89,6 +89,8 @@ pub trait VotingContract {
             is_closed: false,
             can_change_vote,
             whitelisted_addresses: match voter_whitelist {
+                // IMPORTANT: Una llista buida serà tractada com None
+                OptionalValue::Some(whitelist) if whitelist.is_empty() => None,
                 OptionalValue::Some(whitelist) => Some(whitelist),
                 OptionalValue::None => None,
             }
@@ -397,4 +399,3 @@ pub trait VotingContract {
     #[storage_mapper("votes")]
     fn votes(&self, poll_id: u64) -> MapMapper<ManagedAddress<Self::Api>, usize>;
 }
-
