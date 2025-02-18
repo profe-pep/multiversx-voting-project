@@ -8,3 +8,4 @@ export * from './TransactionsTracker';
 export * from './ContractAddress';
 export * from './MissingNativeAuthError';
 export * from './Label';
+export * from './Badge';

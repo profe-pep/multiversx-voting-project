@@ -5,7 +5,8 @@ import { AuthRedirectWrapper } from 'wrappers';
 import { useEffect, useState } from 'react';
 import { Poll } from 'types';
 import { useParams } from "react-router-dom";
-
+import { formatDate, pollNotStarted, pollOngoing, pollEnded } from './utils';
+import { Badge } from 'components';
 
 export const GetPoll = () => {
   const { address, balance } = useGetAccount();
@@ -46,6 +47,20 @@ export const GetPoll = () => {
                 <li key={option.name.toString()}>{option.name.toString()}</li>
             ))}
           </ol>
+          <p className="font-semibold mt-4">Voting period:</p>
+          <p>Start at {formatDate(poll.start_time)}</p> 
+          <p>Ends at {formatDate(poll.end_time)}</p>
+          <p className="mt-4">
+          { pollNotStarted(poll) && (
+            <Badge>Not started</Badge>
+          )}
+          { pollOngoing(poll) && (
+            <Badge color="green">Ongoing</Badge>
+          )}
+          { pollEnded(poll) && (
+            <Badge color="red">Ended</Badge>
+          )}
+          </p>
         </div>
       )}
       </div>

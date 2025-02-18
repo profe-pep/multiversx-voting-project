@@ -5,6 +5,8 @@ import { AuthRedirectWrapper } from 'wrappers';
 import { useEffect, useState } from 'react';
 import { Poll, PollStatus } from 'types';
 import { Link } from "react-router-dom";
+import { formatDate, pollNotStarted, pollOngoing, pollEnded } from './utils';
+import { Badge } from 'components';
 
 export const ListPolls = () => {
   const { address, balance } = useGetAccount();
@@ -36,20 +38,32 @@ export const ListPolls = () => {
       { polls.length > 0 ? (
         polls.map((poll) => {
           return (
-            <div className="flex flex-col gap-6">
-              <div className="rounded-xl bg-white p-6">
-                <Link to={"/polls/"+poll.id.toFixed()}>
-                  <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
-                </Link>
-                <p className="font-semibold mt-4">Question:</p>
-                <p>{poll.question.toString()}</p>
-                <p className="font-semibold mt-4">Options:</p>
-                <ol className="list-[upper-alpha] list-inside">
-                  {poll.options.map((option:any) => (
-                      <li key={option.name.toString()}>{option.name.toString()}</li>
-                  ))}
-                </ol>
-              </div>
+            <div className="rounded-xl bg-white p-6">
+              <Link to={"/polls/"+poll.id.toFixed()}>
+                <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
+              </Link>
+              <p className="font-semibold mt-4">Question:</p>
+              <p>{poll.question.toString()}</p>
+              <p className="font-semibold mt-4">Options:</p>
+              <ol className="list-[upper-alpha] list-inside">
+                {poll.options.map((option:any) => (
+                    <li key={option.name.toString()}>{option.name.toString()}</li>
+                ))}
+              </ol>
+              <p className="font-semibold mt-4">Voting period:</p>
+              <p>Start at {formatDate(poll.start_time)}</p> 
+              <p>Ends at {formatDate(poll.end_time)}</p>
+              <p className="mt-4">
+              { pollNotStarted(poll) && (
+                <Badge>Not started</Badge>
+              )}
+              { pollOngoing(poll) && (
+                <Badge color="green">Ongoing</Badge>
+              )}
+              { pollEnded(poll) && (
+                <Badge color="red">Ended</Badge>
+              )}
+              </p>
             </div>
           )
         })
