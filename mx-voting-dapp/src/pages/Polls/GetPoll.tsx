@@ -1,13 +1,12 @@
 import { useVotingContract } from './votingApi';
-import { ContractAddress } from 'components/ContractAddress';
 import { useGetAccount } from 'hooks';
 import { AuthRedirectWrapper } from 'wrappers';
 import { useEffect, useState } from 'react';
 import { Poll } from 'types';
 import { useParams } from "react-router-dom";
-import { formatDate, pollNotStarted, pollOngoing, pollEnded } from './utils';
-import { Badge, Label } from 'components';
+import { pollOngoing } from './utils';
 import { PollItem } from './components';
+import { Link } from 'react-router-dom';
 
 export const GetPoll = () => {
   const { address, balance } = useGetAccount();
@@ -54,12 +53,20 @@ export const GetPoll = () => {
     <AuthRedirectWrapper>
       <div className='flex flex-col gap-6 max-w-3xl w-full'>
       { poll && (
-        <div className="rounded-xl bg-white p-6">
-          <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
-          <PollItem poll={poll} />
+        <>
+          <div className="flex justify-end">
+            <Link to="/polls" className="flex items-center gap-2">
+              <span className="text-lg text-[#23F7DD]">←</span>
+              <span className="hover:border-b-2 hover:border-[#23F7DD]">Back to Polls</span>
+            </Link>
+          </div>
+          <div className="rounded-xl bg-white p-6">
+            <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
+            <PollItem poll={poll} />
+          </div>
           { pollOngoing(poll) && (
-            <>
-              <h3 className="text-lg font-bold mt-6">You can vote:</h3>
+            <div className="rounded-xl bg-white p-6">
+              <h3 className="text-lg font-bold">You can vote:</h3>
               <div className='flex items-center gap-4 p-5'>
                 <form className="flex flex-col space-y-3 p-4 border border-gray-300 rounded-lg" onSubmit={handleVote}>
                   {poll.options.map((option:any, index) => (
@@ -80,10 +87,11 @@ export const GetPoll = () => {
                     Vote
                   </button>
                 </form>
-              </div>          
-            </>
-          )}
-        </div>
+              </div>
+            </div>
+          )}          
+        </>
+
       )}
       </div>
     </AuthRedirectWrapper>

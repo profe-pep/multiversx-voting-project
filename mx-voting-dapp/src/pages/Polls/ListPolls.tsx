@@ -36,17 +36,17 @@ export const ListPolls = () => {
         <ContractAddress />
         <div className="flex border-b border-gray-300 rounded-xl bg-white p-6">
           {[
-            { label: "Totes", value: undefined },
-            { label: "No iniciades", value: PollStatus.NotStarted },
-            { label: "En curs", value: PollStatus.Ongoing },
-            { label: "Finalitzades", value: PollStatus.Ended },
+            { label: "All", value: undefined },
+            { label: "Not started", value: PollStatus.NotStarted },
+            { label: "Ongoing", value: PollStatus.Ongoing },
+            { label: "Ended", value: PollStatus.Ended },
           ].map((tab) => (
             <button
               key={tab.label}
               className={`py-2 px-4 text-sm font-medium focus:outline-none transition-all ${
                 statusFilter === tab.value
                   ? "border-b-2 border-[#23F7DD] font-semibold"
-                  : "text-gray-40 0hover:text-[#23F7DD] hover:opacity-80"
+                  : "text-gray-400 hover:text-[#23F7DD] hover:opacity-80"
               }`}
               onClick={() => setStatusFilter(tab.value)}
             >

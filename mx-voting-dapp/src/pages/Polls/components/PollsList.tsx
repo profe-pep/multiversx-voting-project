@@ -12,12 +12,12 @@ export const PollsList = ({ children, polls}: PollsPropsType) => {
     { polls !== undefined && polls.length > 0 ? (
       polls.map((poll) => {
         return (
-          <div className="rounded-xl bg-white p-6">
-            <Link to={"/polls/"+poll.id.toFixed()}>
-              <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
-            </Link>
-            <PollItem poll={poll} />
-          </div>
+          <Link to={"/polls/"+poll.id.toFixed()}>
+            <div className="rounded-xl bg-white p-6">
+                <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
+                <PollItem poll={poll} />
+            </div>
+          </Link>
         )
       })
     ):(
