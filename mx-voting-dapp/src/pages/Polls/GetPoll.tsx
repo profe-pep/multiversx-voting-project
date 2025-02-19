@@ -7,6 +7,7 @@ import { Poll } from 'types';
 import { useParams } from "react-router-dom";
 import { formatDate, pollNotStarted, pollOngoing, pollEnded } from './utils';
 import { Badge, Label } from 'components';
+import { PollItem } from './components';
 
 export const GetPoll = () => {
   const { address, balance } = useGetAccount();
@@ -52,33 +53,10 @@ export const GetPoll = () => {
   return (
     <AuthRedirectWrapper>
       <div className='flex flex-col gap-6 max-w-3xl w-full'>
-      <ContractAddress />
-      {poll && (
+      { poll && (
         <div className="rounded-xl bg-white p-6">
           <h2 className="text-xl font-bold">Poll {poll.id.toFixed()}</h2>
-          <p className="font-semibold mt-4">Question:</p>
-          <p>{poll.question.toString()}</p>
-          <p className="font-semibold mt-4">Options:</p>
-          <ol className="list-[upper-alpha] list-inside">
-            { poll.options.map((option:any, index) => (
-                <li key={index}>{option.name.toString()}</li>
-            ))}
-          </ol>
-          <p className="font-semibold mt-4">Voting period:</p>
-          <p>Start at {formatDate(poll.start_time)}</p> 
-          <p>Ends at {formatDate(poll.end_time)}</p>
-          <p className="font-semibold mt-4">Status:</p>
-          <p>
-          { pollNotStarted(poll) && (
-            <Badge>Not started</Badge>
-          )}
-          { pollOngoing(poll) && (
-            <Badge color="green">Ongoing</Badge>
-          )}
-          { pollEnded(poll) && (
-            <Badge color="red">Ended</Badge>
-          )}
-          </p>
+          <PollItem poll={poll} />
           { pollOngoing(poll) && (
             <>
               <h3 className="text-lg font-bold mt-6">You can vote:</h3>
