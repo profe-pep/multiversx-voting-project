@@ -9,11 +9,8 @@ import { PollItem } from './components';
 import { Link } from 'react-router-dom';
 
 export const GetPoll = () => {
-  const { address, balance } = useGetAccount();
-  const {
-    getPoll,
-    castVote
-  } = useVotingContract(address, balance);
+  const { address } = useGetAccount();
+  const { getPoll, castVote } = useVotingContract(address);
   
   const { id } = useParams();
   const pollId = Number(id);
