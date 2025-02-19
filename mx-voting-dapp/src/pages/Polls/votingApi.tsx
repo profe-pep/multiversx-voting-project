@@ -7,7 +7,6 @@ import {
   ResultsParser
 } from 'utils';
 import { abi, smartContract } from './votingSmartContract';
-import { useEffect, useState } from 'react';
 import { contractAddress } from 'config';
 import { signAndSendTransactions } from 'helpers';
 import {
@@ -108,13 +107,16 @@ export const useVotingContract = (
     statusFilter?: PollStatus // Optional
   ) => {
     try {
+      // Codificació de l'argument segons el format esperat pel smart contract
+      const encodedStatus = statusFilter !== undefined
+        // "0x01" + PollStatus (en hexadecimal)
+        ? `01${statusFilter.toString(16).padStart(2, '0')}`
+        // "0x00" per indicar "None"
+        : '00';
+      
       const query = smartContract.createQuery({
         func: new ContractFunction('getPolls'),
-        args: [
-          statusFilter !== undefined
-            ? new U8Value(statusFilter) // Si està definit, el convertim a U8Value
-            : OptionalValue.newMissing() // Si no està definit, passem Missing
-        ]
+        args: [BytesValue.fromHex(encodedStatus)]
       });
   
       const queryResponse = await proxy.queryContract(query);

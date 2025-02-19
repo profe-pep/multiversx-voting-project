@@ -13,10 +13,11 @@ export const ListPolls = () => {
   } = useVotingContract(address, balance);
   
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [statusFilter, setStatusFilter] = useState<PollStatus>();
 
   useEffect(() => {
     console.log("Endpoint 'getPolls': Request");
-    getPolls()
+    getPolls(statusFilter)
       .then((resp) => {
         setPolls(resp?.valueOf());
       })
@@ -27,12 +28,32 @@ export const ListPolls = () => {
       .finally(() => {
         console.log("Endpoint 'getPolls': Response");
       });    
-  }, []);
+  }, [statusFilter]);
 
   return (
     <AuthRedirectWrapper>
-      <div className='flex flex-col gap-6 max-w-3xl w-full'>
-        <ContractAddress />      
+      <div className="flex flex-col gap-6 max-w-3xl w-full">
+        <ContractAddress />
+        <div className="flex border-b border-gray-300 rounded-xl bg-white p-6">
+          {[
+            { label: "Totes", value: undefined },
+            { label: "No iniciades", value: PollStatus.NotStarted },
+            { label: "En curs", value: PollStatus.Ongoing },
+            { label: "Finalitzades", value: PollStatus.Ended },
+          ].map((tab) => (
+            <button
+              key={tab.label}
+              className={`py-2 px-4 text-sm font-medium focus:outline-none transition-all ${
+                statusFilter === tab.value
+                  ? "border-b-2 border-[#23F7DD] font-semibold"
+                  : "text-gray-40 0hover:text-[#23F7DD] hover:opacity-80"
+              }`}
+              onClick={() => setStatusFilter(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <PollsList polls={polls}/>
       </div>
     </AuthRedirectWrapper>
