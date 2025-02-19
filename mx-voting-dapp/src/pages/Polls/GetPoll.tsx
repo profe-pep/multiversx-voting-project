@@ -20,17 +20,18 @@ export const GetPoll = () => {
   const [poll, setPoll] = useState<Poll>();
 
   useEffect(() => {
-    console.log(`Endpoint 'getPoll': Request {id}`);
+    console.log("Endpoint 'getPoll': Request STARTS");
     getPoll(pollId)
       .then((resp) => {
+        console.log("Endpoint 'getPoll': OK");
         setPoll(resp?.valueOf());
       })
       .catch((error) => {
-        console.error("ERROR:", error);
-        alert("Error obtenint llistat de votacions");
+        console.error("Endpoint 'getPoll': ERROR ", error);
+        alert("Error getting poll data");
       })
       .finally(() => {
-        console.log("Endpoint 'getPolls': Response");
+        console.log("Endpoint 'getPolls': Response ENDS");
       });    
   }, []);
   
@@ -46,7 +47,18 @@ export const GetPoll = () => {
     
     const pollOption = Number(selectedOption);
     console.log("Has triat l'opció " + pollOption + " a la votació " + pollId);
-    castVote(pollId, pollOption);
+    console.log(`Endpoint 'castVote': Request STARTS`);
+    castVote(pollId, pollOption)
+      .then((resp) => {
+        console.log("Endpoint 'castVote': OK ", resp);
+      })
+      .catch((error) => {
+        console.error("Endpoint 'castVote': ERROR ", error);
+        alert("Error voting");
+      })
+      .finally(() => {
+        console.log("Endpoint 'castVote': Response ENDS");
+      });
   };
 
   return (

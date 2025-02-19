@@ -7,38 +7,41 @@ import { Poll, PollStatus } from 'types';
 import { PollsList } from './components';
 
 export const ListPolls = () => {
-  const { address, balance } = useGetAccount();
-  const { getPolls } = useVotingContract(address, balance);
+  const { address } = useGetAccount();
+  const { getPolls, createPoll } = useVotingContract(address);
   
   const [polls, setPolls] = useState<Poll[]>([]);
   const [statusFilter, setStatusFilter] = useState<PollStatus>();
+  const [pollCreated, setPollCreated] = useState<boolean>(false);
 
-  const [showForm, setShowForm] = useState(false); // Estat per mostrar/amagar el formulari
-  const [form, setForm] = useState({
+  useEffect(() => {
+    console.log("Endpoint 'getPolls': Request STARTS");
+    getPolls(statusFilter)
+      .then((resp) => {
+        console.log("Endpoint 'getPolls': OK");
+        setPolls(resp?.valueOf());
+      })
+      .catch((error) => {
+        console.error("Endpoint 'getPolls': ERROR ", error);
+        alert("Error getting polls list");
+      })
+      .finally(() => {
+        console.log("Endpoint 'getPolls': Response ENDS");
+        setPollCreated(false); // Reinicia després d'actualitzar les votacions
+      });    
+  }, [statusFilter, pollCreated]);
+
+  const emptyForm = {
     question: '',
     options: '',
     start_time: '',
     end_time: '',
     can_change_vote: false,
     whitelisted_addresses: '',
-  });
+  }
+  const [form, setForm] = useState(emptyForm);
+  const [showForm, setShowForm] = useState(false); // Mostrar/amagar el formulari
 
-  useEffect(() => {
-    console.log("Endpoint 'getPolls': Request");
-    getPolls(statusFilter)
-      .then((resp) => {
-        setPolls(resp?.valueOf());
-      })
-      .catch((error) => {
-        console.error("ERROR:", error);
-        alert("Error obtenint llistat de votacions");
-      })
-      .finally(() => {
-        console.log("Endpoint 'getPolls': Response");
-      });    
-  }, [statusFilter]);
-
-  // Funció genèrica per actualitzar qualsevol camp del formulari
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -50,19 +53,35 @@ export const ListPolls = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const pollData = {
-      ...form,
+      question: form.question,
       options: form.options.split(',').map(opt => opt.trim()), // Convertir string en array
-      start_time: new Date(form.start_time).getTime() / 1000,
-      end_time: new Date(form.end_time).getTime() / 1000,
-      whitelisted_addresses: form.whitelisted_addresses
+      startTime: new Date(form.start_time).getTime() / 1000, // Canvi de `start_time` a `startTime`
+      endTime: new Date(form.end_time).getTime() / 1000, // Canvi de `end_time` a `endTime`
+      canChangeVote: form.can_change_vote, // Canvi de `can_change_vote` a `canChangeVote`
+      voterWhitelist: form.whitelisted_addresses // Canvi de `whitelisted_addresses` a `voterWhitelist`
         ? form.whitelisted_addresses.split(',').map(addr => addr.trim())
         : undefined,
     };
     console.log("Poll data:", pollData);
-    // Aquí pots enviar `pollData` on sigui necessari (API, smart contract, etc.)    
-    setShowForm(false); // Tancar el formulari després de crear el poll
+    console.log(`Endpoint 'createPoll': Request STARTS`);
+    createPoll({ ...pollData })
+      .then((resp) => {
+        console.log("Endpoint 'createPoll': OK ", resp);
+        // Reset form
+        setShowForm(false); 
+        setForm(emptyForm);
+        // Refresh list
+        setPollCreated(true);
+      })
+      .catch((error) => {
+        console.error("Endpoint 'createPoll': ERROR ", error);
+        alert("Error creating poll");
+      })
+      .finally(() => {
+        console.log("Endpoint 'createPoll': Response ENDS");
+      });
   };
-  
+
   return (
     <AuthRedirectWrapper>
       <div className="flex flex-col gap-6 max-w-3xl w-full">

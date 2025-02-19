@@ -14,20 +14,19 @@ import {
   TransactionsFactoryConfig
 } from '@multiversx/sdk-core/out';
 import {
-  List,
   U8Value,
   U64Value,
   BooleanValue,
   BytesValue,
-  OptionalValue,
+  BigUIntValue, 
+  ArgSerializer
 } from '@multiversx/sdk-core';
 import { PollStatus } from 'types';
 
 const resultsParser = new ResultsParser();
 
 export const useVotingContract = (
-  userAddress: string,
-  balance: string
+  userAddress: string
 ) => {
 
   const { network } = useGetNetworkConfig();
@@ -64,22 +63,24 @@ export const useVotingContract = (
       config: factoryConfig,
       abi
     });
-  
-    // Creem els arguments per a createPoll
+
+    // Convertim els valors al format correcte
     const args = [
-      BytesValue.fromUTF8(question), // Pregunta com a bytes
-      new List(BytesValue, options.map(option => BytesValue.fromUTF8(option))), // Opcions com a llista de bytes
-      new U64Value(startTime), // Hora d'inici
-      new U64Value(endTime),   // Hora de finalització
-      new BooleanValue(canChangeVote), // Canvi de vot permès o no
+      BytesValue.fromUTF8(question), // Pregunta com a cadena UTF-8
+      options.map(opt => BytesValue.fromUTF8(opt)), // Opcions com a List<bytes>
+      new BigUIntValue(startTime), // Temps d'inici en BigUInt
+      new BigUIntValue(endTime), // Temps de finalització en BigUInt
+      new BooleanValue(canChangeVote), // Boolean
     ];
-  
-    // Si hi ha cens de votants, l'afegim als arguments
+
+    // TODO Fix voters whitelist
+    // Afegim el cens opcionalment
     if (voterWhitelist.length > 0) {
-      const whitelist = new List(Address, voterWhitelist.map(addr => new Address(addr)));
-      args.push(whitelist);
+      // Convertim cada adreça a BytesValue
+      const whitelistSerialized = voterWhitelist.map(addr => BytesValue.fromHex(addr));
+      args.push(whitelistSerialized);
     }
-  
+    
     // Creem la transacció
     const transaction = factory.createTransactionForExecute({
       sender: new Address(userAddress),
@@ -94,13 +95,15 @@ export const useVotingContract = (
       transactions: [transaction],
       callbackRoute: '',
       transactionsDisplayInfo: {
-        processingMessage: 'Creant la votació...',
-        errorMessage: 'No s\'ha pogut crear la votació.',
-        successMessage: 'Votació creada amb èxit!'
+        processingMessage: 'Creating poll...',
+        errorMessage: 'Error during poll creation :-(',
+        successMessage: 'Poll sucessfuly created!'
       }
     });
   
     console.log('Sessió iniciada amb ID:', sessionId);
+
+    return sessionId;
   };
   
   const getPolls = async (
@@ -127,8 +130,8 @@ export const useVotingContract = (
         queryResponse,
         endpointDefinition
       );
-  
-      console.log('Polls:', polls?.valueOf());
+
+      // console.log('Polls:', polls?.valueOf());
       return polls;
     } catch (err) {
       console.error('Unable to call getPolls', err);
@@ -156,7 +159,7 @@ export const useVotingContract = (
         endpointDefinition
       );
   
-      console.log('Poll:', poll?.valueOf());
+      // console.log('Poll:', poll?.valueOf());
       return poll;
     } catch (err) {
       console.error('Unable to call getPoll', err);
@@ -199,6 +202,10 @@ export const useVotingContract = (
         successMessage: 'Vote successfully stored!'
       }
     });
+    
+    console.log('Sessió iniciada amb ID:', sessionId);
+
+    return sessionId;
   };
 
   return {
